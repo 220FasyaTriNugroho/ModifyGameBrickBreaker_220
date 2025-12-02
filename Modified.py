@@ -1,5 +1,7 @@
 import tkinter as tk
+from PIL import Image, ImageTk
 import random
+import os
 
 class GameObject(object):
     def __init__(self, canvas, item):
@@ -20,8 +22,6 @@ class Ball(GameObject):
     def __init__(self, canvas, x, y):
         self.radius = 10
         self.direction = [1, -1]
-        
-        # membuat gameplay lebih "Smooth"
         self.speed = 3.0
         
         item = canvas.create_oval(x-self.radius, y-self.radius,
@@ -70,59 +70,51 @@ class Paddle(GameObject):
         self.height = 10
         self.ball = None
         
-        # --- FISIKA PADDLE (MOVE FADE) ---
-        self.velocity = 0.0      # Kecepatan saat ini
-        self.acceleration = 1.5  # Seberapa cepat paddle menambah speed
-        self.friction = 0.85     # Gesekan (semakin kecil, semakin cepat berhenti / kurang licin)
-        self.max_speed = 12.0    # Batas kecepatan maksimum paddle
+        self.velocity = 0.0      
+        self.acceleration = 1.5  
+        self.friction = 0.85     
+        self.max_speed = 12.0    
         
         item = canvas.create_rectangle(x - self.width / 2,
                                        y - self.height / 2,
                                        x + self.width / 2,
                                        y + self.height / 2,
                                        fill='#FFB643')
+        
         super(Paddle, self).__init__(canvas, item)
 
     def set_ball(self, ball):
         self.ball = ball
 
-    # Method baru untuk update fisika paddle setiap frame
     def update_physics(self, left_pressed, right_pressed):
-        # 1. Tambah kecepatan berdasarkan input (Akselerasi)
         if left_pressed:
             self.velocity -= self.acceleration
         if right_pressed:
             self.velocity += self.acceleration
 
-        # 2. Terapkan Gesekan (Friction) agar paddle melambat jika tidak dipencet
-        #    atau agar tidak terus bertambah cepat tanpa batas
         self.velocity *= self.friction
 
-        # 3. Batasi Kecepatan Maksimum (Cap Speed)
         if self.velocity > self.max_speed:
             self.velocity = self.max_speed
         elif self.velocity < -self.max_speed:
             self.velocity = -self.max_speed
 
-        # 4. Cek batas tembok sebelum bergerak (Wall Collision)
         coords = self.get_position()
         width = self.canvas.winfo_width()
         
-        # Jika nabrak kiri dan mau ke kiri, stop
-        if coords[0] + self.velocity < 0:
+        x_left = coords[0]
+        x_right = coords[2]
+
+        if x_left + self.velocity < 0:
             self.velocity = 0
-            # Paksa posisi ke pinggir pas
-            self.move(-coords[0], 0) 
+            self.move(-x_left, 0) 
             return
 
-        # Jika nabrak kanan dan mau ke kanan, stop
-        if coords[2] + self.velocity > width:
+        if x_right + self.velocity > width:
             self.velocity = 0
-            # Paksa posisi ke pinggir pas
-            self.move(width - coords[2], 0)
+            self.move(width - x_right, 0)
             return
 
-        # 5. Gerakkan Paddle (jika velocity sangat kecil, anggap 0)
         if abs(self.velocity) < 0.1:
             self.velocity = 0
         else:
@@ -167,10 +159,12 @@ class Game(tk.Frame):
         self.canvas.pack()
         self.pack()
 
-        # --- SISTEM INPUT BARU ---
-        # Kita menggunakan set() untuk menyimpan tombol apa saja yang sedang ditekan
-        self.pressed_keys = set()
+        # Tambahkan background image
+        self.background_image = None
+        self.background_photo = None
+        self.load_background()
 
+        self.pressed_keys = set()
         self.items = {}
         self.balls = [] 
 
@@ -186,15 +180,87 @@ class Game(tk.Frame):
         self.setup_game()
         self.canvas.focus_set()
         
-        # Binding event KeyPress dan KeyRelease
         self.canvas.bind('<KeyPress>', self.on_key_press)
         self.canvas.bind('<KeyRelease>', self.on_key_release)
 
-    # Saat tombol ditekan, masukkan ke dalam set
+    def load_background(self):
+        try:
+            # Coba cari file background (GIF)
+            bg_path = None
+            for ext in ['bbbackground.gif']:
+                if os.path.exists(ext):
+                    bg_path = ext
+                    break
+            
+            if bg_path:
+                # Buka gambar
+                self.bg_image = Image.open(bg_path)
+                
+                # Cek apakah GIF animasi
+                self.is_animated_gif = False
+                self.gif_frames = []
+                self.gif_frame_index = 0
+                self.gif_frame_delay = 100  # default delay
+                
+                try:
+                    # Coba ekstrak semua frame dari GIF
+                    frame_count = 0
+                    while True:
+                        frame = self.bg_image.copy()
+                        frame = frame.resize((self.width, self.height), Image.LANCZOS)
+                        self.gif_frames.append(ImageTk.PhotoImage(frame))
+                        frame_count += 1
+                        self.bg_image.seek(frame_count)
+                    
+                except EOFError:
+                    # Sudah sampai akhir frame
+                    if frame_count > 1:
+                        self.is_animated_gif = True
+                        # Ambil duration dari GIF
+                        try:
+                            self.gif_frame_delay = self.bg_image.info.get('duration', 100)
+                        except:
+                            self.gif_frame_delay = 100
+                        print(f"GIF animasi berhasil dimuat! Total frame: {frame_count}")
+                    else:
+                        # Hanya 1 frame, treat sebagai gambar biasa
+                        self.background_photo = self.gif_frames[0]
+                        print("Background image berhasil dimuat!")
+                
+                # Buat image object di canvas
+                self.background_image = self.canvas.create_image(
+                    0, 0, 
+                    image=self.gif_frames[0] if self.gif_frames else self.background_photo, 
+                    anchor='nw',
+                    tags='background'
+                )
+                # Pastikan background ada di layer paling bawah
+                self.canvas.tag_lower('background')
+                
+                # Mulai animasi jika GIF
+                if self.is_animated_gif:
+                    self.animate_background()
+                    
+            else:
+                print("File bbbackground.png atau bbbackground.gif tidak ditemukan.")
+                print("Menggunakan warna default.")
+        except Exception as e:
+            print(f"Error loading background image: {e}")
+            print("Menggunakan warna background default.")
+    
+    def animate_background(self):
+        """Animasi frame GIF background"""
+        if self.is_animated_gif and len(self.gif_frames) > 0:
+            # Update ke frame berikutnya
+            self.gif_frame_index = (self.gif_frame_index + 1) % len(self.gif_frames)
+            self.canvas.itemconfig(self.background_image, 
+                                  image=self.gif_frames[self.gif_frame_index])
+            # Schedule frame berikutnya
+            self.after(self.gif_frame_delay, self.animate_background)
+
     def on_key_press(self, event):
         self.pressed_keys.add(event.keysym)
 
-    # Saat tombol dilepas, hapus dari set
     def on_key_release(self, event):
         if event.keysym in self.pressed_keys:
             self.pressed_keys.remove(event.keysym)
@@ -208,13 +274,12 @@ class Game(tk.Frame):
            self.update_lives_text()
            self.text = self.draw_text(300, 200,
                                       'Press Space to start')
-           # Space hanya sekali pakai, jadi bind biasa
            self.canvas.bind('<space>', lambda _: self.start_game())
 
     def add_initial_ball(self):
         paddle_coords = self.paddle.get_position()
-        x = (paddle_coords[0] + paddle_coords[2]) * 0.5
-        ball = Ball(self.canvas, x, 310)
+        x_center = (paddle_coords[0] + paddle_coords[2]) * 0.5
+        ball = Ball(self.canvas, x_center, 310) 
         self.paddle.set_ball(ball)
         self.balls.append(ball) 
 
@@ -249,15 +314,11 @@ class Game(tk.Frame):
         self.game_loop()
 
     def game_loop(self):
-        # --- UPDATE PADDLE DENGAN PHYSICS ---
-        # Cek apakah tombol kiri atau kanan ada di dalam set pressed_keys
         left_is_pressed = 'Left' in self.pressed_keys
         right_is_pressed = 'Right' in self.pressed_keys
         
-        # Panggil fungsi fisika paddle
         self.paddle.update_physics(left_is_pressed, right_is_pressed)
 
-        # --- UPDATE BOLA ---
         bricks_hit_coords = [] 
         for ball in list(self.balls):
             ball.update()
@@ -272,7 +333,6 @@ class Game(tk.Frame):
             if len(self.balls) < 15: 
                 self.spawn_extra_ball(coords)
 
-        # --- GAME LOGIC ---
         num_bricks = len(self.canvas.find_withtag('brick'))
         if num_bricks == 0:
             for b in self.balls: b.speed = None
@@ -284,7 +344,7 @@ class Game(tk.Frame):
             else:
                 self.after(1000, self.setup_game)
         else:
-            self.after(16, self.game_loop) # Tetap 60 FPS
+            self.after(16, self.game_loop) 
 
     def check_collisions(self, ball_to_check):
         ball_coords = ball_to_check.get_position()
@@ -294,6 +354,6 @@ class Game(tk.Frame):
 
 if __name__ == '__main__':
     root = tk.Tk()
-    root.title('Smooth Physics Breakout')
+    root.title('Smooth Physics Breakout with Background')
     game = Game(root)
     game.mainloop()
