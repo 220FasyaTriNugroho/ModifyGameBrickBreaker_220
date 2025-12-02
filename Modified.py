@@ -301,7 +301,6 @@ class Game(tk.Frame):
 
     def draw_text(self, x, y, text, size='40'):
         # MENGUBAH FONT DI SINI
-        # Menggunakan 'Courier New' dan 'bold' untuk tema retro/cyberpunk
         font = ('Courier New', size, 'bold')
         return self.canvas.create_text(x, y, text=text,
                                        font=font)
@@ -360,6 +359,6 @@ class Game(tk.Frame):
 
 if __name__ == '__main__':
     root = tk.Tk()
-    root.title('Cyberpunk Breakout')
+    root.title('Bola-Bola')
     game = Game(root)
     game.mainloop()
