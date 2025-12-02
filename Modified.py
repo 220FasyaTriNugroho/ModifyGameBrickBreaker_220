@@ -26,7 +26,7 @@ class Ball(GameObject):
         
         item = canvas.create_oval(x-self.radius, y-self.radius,
                                   x+self.radius, y+self.radius,
-                                  fill='white')
+                                  fill="#FF0000", outline='black', width=2)
         super(Ball, self).__init__(canvas, item)
 
     def update(self):
@@ -66,8 +66,8 @@ class Ball(GameObject):
 
 class Paddle(GameObject):
     def __init__(self, canvas, x, y):
-        self.width = 80
-        self.height = 10
+        self.width = 120 
+        self.height = 12
         self.ball = None
         
         self.velocity = 0.0      
@@ -79,7 +79,7 @@ class Paddle(GameObject):
                                        y - self.height / 2,
                                        x + self.width / 2,
                                        y + self.height / 2,
-                                       fill='#FFB643')
+                                       fill='#2C3E50', outline='#00FFFF', width=3)
         
         super(Paddle, self).__init__(canvas, item)
 
@@ -124,18 +124,20 @@ class Paddle(GameObject):
 
 
 class Brick(GameObject):
-    COLORS = {1: '#4535AA', 2: '#ED639E', 3: '#8FE1A2'}
+    COLORS = {1: '#00D2FF', 2: '#FF00FF', 3: '#9D00FF'}
 
     def __init__(self, canvas, x, y, hits):
         self.width = 75
         self.height = 20
         self.hits = hits
         color = Brick.COLORS[hits]
+        
         item = canvas.create_rectangle(x - self.width / 2,
                                        y - self.height / 2,
                                        x + self.width / 2,
                                        y + self.height / 2,
-                                       fill=color, tags='brick')
+                                       fill=color, tags='brick',
+                                       outline='white', width=2)
         super(Brick, self).__init__(canvas, item)
 
     def hit(self):
@@ -159,7 +161,7 @@ class Game(tk.Frame):
         self.canvas.pack()
         self.pack()
 
-        # Tambahkan background image
+        # Tambahkan background image (Logika tetap sama seperti request)
         self.background_image = None
         self.background_photo = None
         self.load_background()
@@ -183,6 +185,7 @@ class Game(tk.Frame):
         self.canvas.bind('<KeyPress>', self.on_key_press)
         self.canvas.bind('<KeyRelease>', self.on_key_release)
 
+    # --- BAGIAN INI TIDAK DIUBAH SAMA SEKALI (CUSTOM BG LOGIC) ---
     def load_background(self):
         try:
             # Coba cari file background (GIF)
@@ -242,7 +245,7 @@ class Game(tk.Frame):
                     self.animate_background()
                     
             else:
-                print("File bbbackground.png atau bbbackground.gif tidak ditemukan.")
+                print("File bbbackground.gif tidak ditemukan.")
                 print("Menggunakan warna default.")
         except Exception as e:
             print(f"Error loading background image: {e}")
@@ -257,6 +260,7 @@ class Game(tk.Frame):
                                   image=self.gif_frames[self.gif_frame_index])
             # Schedule frame berikutnya
             self.after(self.gif_frame_delay, self.animate_background)
+    # -------------------------------------------------------------
 
     def on_key_press(self, event):
         self.pressed_keys.add(event.keysym)
@@ -296,12 +300,14 @@ class Game(tk.Frame):
         self.items[brick.item] = brick
 
     def draw_text(self, x, y, text, size='40'):
-        font = ('Forte', size)
+        # MENGUBAH FONT DI SINI
+        # Menggunakan 'Courier New' dan 'bold' untuk tema retro/cyberpunk
+        font = ('Courier New', size, 'bold')
         return self.canvas.create_text(x, y, text=text,
                                        font=font)
 
     def update_lives_text(self):
-        text = 'Lives: %s' % self.lives
+        text = ' Health: %s' % self.lives
         if self.hud is None:
             self.hud = self.draw_text(50, 20, text, 15)
         else:
@@ -354,6 +360,6 @@ class Game(tk.Frame):
 
 if __name__ == '__main__':
     root = tk.Tk()
-    root.title('Smooth Physics Breakout with Background')
+    root.title('Cyberpunk Breakout')
     game = Game(root)
     game.mainloop()
